@@ -18,6 +18,8 @@ save_grid: false
 room_type: "unified"
 out_dir: "datasets/results/sample_unified_mix_test_arch"
 floor_plan_dir: "datasets/results/arch_plan"
+# 追加
+fixed_floor_plan_index: 0
 
 # === CUSTOM DATA MODE SETTINGS ===
 # Used when use_custom_data: true
@@ -32,7 +34,7 @@ idx_to_label_dir: "preprocess/metadata"
 
 # Room type settings
 room_type_condition: true
-sample_room_type: 1  # 0=bedroom, 1=livingroom, 2=diningroom
+sample_room_type: 2 # 0=bedroom, 1=livingroom, 2=diningroom
 
 # Floor plan and architecture settings
 w_arch: true  # Set to true if using architectural elements (doors/windows)
@@ -41,14 +43,14 @@ wo_room: false
 # Conditioning settings
 text_condition: false
 mixed_condition: true
-condition_type: floor  # Options: "uncon", "floor", "arch"
+condition_type: arch  # Options: "uncon", "floor", "arch"
 
 # === EXAMPLES ===
 # Example 1: Original data sampling
 # use_custom_data: false
 # samples: 10
 # condition_type: "arch"
-# sample_room_type: 1
+# sample_room_type: 2
 
 # Example 2: Custom floor plan sampling
 # use_custom_data: true

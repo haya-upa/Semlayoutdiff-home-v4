@@ -682,10 +682,30 @@ class LayoutSampler:
         with torch.no_grad():
             if self.args.floor_plan:
                 # Prepare floor plans
-                start_idx = self.cfg.seed * self.cfg.samples
-                end_idx = (self.cfg.seed + 1) * self.cfg.samples
-                selected_floor_plans = floor_plans[start_idx:end_idx]
+                #変更
+                # start_idx = self.cfg.seed * self.cfg.samples
+                # end_idx = (self.cfg.seed + 1) * self.cfg.samples
+                # selected_floor_plans = floor_plans[start_idx:end_idx]
 
+                fixed_idx = self.cfg.get("fixed_floor_plan_index", 0)
+
+                if fixed_idx < 0 or fixed_idx >= len(floor_plans):
+                    raise IndexError(
+                        f"fixed_floor_plan_index={fixed_idx} is out of range "
+                        f"(0-{len(floor_plans) - 1})"
+                    )
+
+                selected_floor_plans = [
+                    floor_plans[fixed_idx].clone()
+                    for _ in range(self.cfg.samples)
+                ]
+
+                print(
+                    f"Using fixed architecture mask index {fixed_idx} "
+                    f"for all {self.cfg.samples} samples"
+                )
+                #変更ここまで
+                
                 if self.cfg.w_arch:
                     concatenated_floor_plans = torch.cat(selected_floor_plans, dim=0).unsqueeze(1).to(self.device)
                 else:
