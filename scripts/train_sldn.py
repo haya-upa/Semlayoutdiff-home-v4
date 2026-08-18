@@ -8,6 +8,7 @@ supporting various conditioning modes including floor plans, room types, text, a
 import argparse
 import os
 import yaml
+import torch
 
 # Core utilities
 from semlayoutdiff.sldn.diffusion_utils import add_parent_path, set_seeds
@@ -69,6 +70,13 @@ def setup_argument_parser():
         '--config', 
         type=str, 
         help='Path to YAML configuration file (overrides command line arguments)'
+    )
+
+    parser.add_argument(
+        '--pretrained_checkpoint',
+        type=str,
+        default=None,
+        help='Path to a pretrained SLDN checkpoint for fine-tuning'
     )
     
     return parser
@@ -133,6 +141,47 @@ def initialize_model(args, data_shape):
     print(f"Model initialized - ID: {model_id}")
     return model, model_id
 
+def load_pretrained_weights(args, model):
+    """Load pretrained SLDN state for fine-tuning."""
+
+    if args.pretrained_checkpoint is None:
+        print("No pretrained checkpoint specified - training from scratch")
+        return model
+
+    checkpoint_path = args.pretrained_checkpoint
+
+    if not os.path.isfile(checkpoint_path):
+        raise FileNotFoundError(
+            f"Pretrained checkpoint not found: {checkpoint_path}"
+        )
+
+    print(f"Loading pretrained SLDN from: {checkpoint_path}")
+
+    checkpoint = torch.load(
+        checkpoint_path,
+        map_location="cpu",
+        weights_only=True
+    )
+
+    if "model" not in checkpoint:
+        raise KeyError(
+            f"'model' key not found in checkpoint: {checkpoint_path}"
+        )
+
+    model.load_state_dict(
+        checkpoint["model"],
+        strict=True
+    )
+
+    # Reset timestep-loss statistics from the previous training objective.
+    model.Lt_history.zero_()
+    model.Lt_count.zero_()
+
+    print("Pretrained SLDN loaded successfully (strict=True)")
+    print("Lt_history / Lt_count reset for fine-tuning")
+
+    return model
+
 
 def initialize_optimizer(args, model):
     """
@@ -164,8 +213,10 @@ def main():
     # Initialize components
     train_loader, eval_loader, data_shape, num_classes, data_id = initialize_data(args)
     model, model_id = initialize_model(args, data_shape)
+    # Load pretrained SLDN before creating a new optimizer.
+    model = load_pretrained_weights(args, model)
     optimizer, scheduler_iter, scheduler_epoch, optim_id = initialize_optimizer(args, model)
-    
+
     # Create and run experiment
     experiment = Experiment(
         args=args,
