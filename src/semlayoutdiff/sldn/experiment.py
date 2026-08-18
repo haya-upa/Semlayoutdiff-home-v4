@@ -1,14 +1,14 @@
 import torch
-from diffusion_utils.loss import elbo_bpd, floor_loss
-from diffusion_utils.utils import add_parent_path
+from semlayoutdiff.sldn.diffusion_utils.loss import elbo_bpd, floor_loss
+from semlayoutdiff.sldn.diffusion_utils.utils import add_parent_path
 import wandb
 import numpy as np
 import json
 import os
 
 add_parent_path(level=2)
-from diffusion_utils.experiment import DiffusionExperiment
-from diffusion_utils.experiment import add_exp_args as add_exp_args_parent
+from semlayoutdiff.sldn.diffusion_utils.experiment import DiffusionExperiment
+from semlayoutdiff.sldn.diffusion_utils.experiment import add_exp_args as add_exp_args_parent
 
 
 def add_exp_args(parser):

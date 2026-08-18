@@ -1,5 +1,5 @@
 import torch
-from diffusion_utilssion_utils.utils import get_args_table, clean_dict
+from .utils import get_args_table, clean_dict
 
 # Path
 import os
@@ -8,8 +8,8 @@ import pathlib
 HOME = str(pathlib.Path.home())
 
 # Experiment
-from diffusion_utils import BaseExperiment
-from diffusion_utilssion_utils.base import DataParallelDistribution
+from .base import BaseExperiment
+from .base import DataParallelDistribution
 
 #  Logging frameworks
 from torch.utils.tensorboard import SummaryWriter
