@@ -98,7 +98,8 @@ class MultinomialDiffusion(torch.nn.Module):
     """
     
     def __init__(self, num_classes, shape, denoise_fn, timesteps=1000,
-                 loss_type='vb_stochastic', parametrization='x0'):
+                 loss_type='vb_stochastic', parametrization='x0',
+                 architecture_fixed=False):
         super(MultinomialDiffusion, self).__init__()
         assert loss_type in ('vb_stochastic', 'vb_all')
         assert parametrization in ('x0', 'direct')
@@ -113,6 +114,7 @@ class MultinomialDiffusion(torch.nn.Module):
         self.shape = shape
         self.num_timesteps = timesteps
         self.parametrization = parametrization
+        self.architecture_fixed = architecture_fixed
 
         alphas = cosine_beta_schedule(timesteps)
 
@@ -259,7 +261,7 @@ class MultinomialDiffusion(torch.nn.Module):
 
         log_sample = self.log_sample_categorical(log_EV_qxt_x0)
 
-        if floor_plan is not None:
+        if self.architecture_fixed and floor_plan is not None:
             if floor_plan.dim() == 4 and floor_plan.size(1) == 1:
                 arch_map = floor_plan
             elif floor_plan.dim() == 3:

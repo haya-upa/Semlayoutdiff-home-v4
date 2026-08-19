@@ -10,6 +10,7 @@ def add_model_args(parser):
     parser.add_argument('--diffusion_steps', type=int, default=1000)
     parser.add_argument('--diffusion_dim', type=int, default=64)
     parser.add_argument('--dp_rate', type=float, default=0.)
+    parser.add_argument('--architecture_fixed', action='store_true')
 
 
 def get_model_id(args):
@@ -36,6 +37,7 @@ def get_model(args, data_shape):
 
     base_dist = MultinomialDiffusion(
         args.num_classes, current_shape, dynamics, timesteps=args.diffusion_steps,
-        loss_type=args.loss_type)
+        loss_type=args.loss_type,
+        architecture_fixed=args.architecture_fixed)
 
     return base_dist
