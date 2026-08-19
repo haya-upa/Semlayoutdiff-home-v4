@@ -211,7 +211,7 @@ def main():
     print(f"Starting SLDN training with seed: {args.seed}")
     
     # Initialize components
-git     train_loader, eval_loader, data_shape, num_classes, data_id = initialize_data(args)
+    train_loader, eval_loader, data_shape, num_classes, data_id = initialize_data(args)
     model, model_id = initialize_model(args, data_shape)
     # Load pretrained SLDN before creating a new optimizer.
     model = load_pretrained_weights(args, model)
