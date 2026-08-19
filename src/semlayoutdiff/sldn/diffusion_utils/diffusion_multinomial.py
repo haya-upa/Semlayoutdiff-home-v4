@@ -503,11 +503,82 @@ class MultinomialDiffusion(torch.nn.Module):
         zs = torch.zeros((self.num_timesteps, b) + self.shape).long()
 
         log_z = self.log_sample_categorical(uniform_logits)
+
+        if self.architecture_fixed:
+            if floor_plan is None:
+                raise ValueError(
+                    "architecture_fixed=True requires an Architecture floor_plan"
+                )
+
+            if floor_plan.dim() == 4 and floor_plan.size(1) == 1:
+                arch_map = floor_plan
+            elif floor_plan.dim() == 3:
+                arch_map = floor_plan.unsqueeze(1)
+            else:
+                raise ValueError(
+                    f"Unexpected Architecture shape: {tuple(floor_plan.shape)}"
+                )
+
+            if arch_map.size(0) != b:
+                raise ValueError(
+                    f"Architecture batch size {arch_map.size(0)} "
+                    f"does not match num_samples {b}"
+                )
+
+            valid_arch = (
+                (arch_map == 0)
+                | (arch_map == 1)
+                | (arch_map == 2)
+                | (arch_map == 3)
+            )
+            if not torch.all(valid_arch):
+                raise ValueError(
+                    "Architecture map contains values outside 0/1/2/3"
+                )
+
+            # Architecture -> fixed semantic labels:
+            # 0 = void, 2 = door(36), 3 = window(37).
+            # Architecture 1 remains the generation region.
+            fixed_labels = torch.zeros_like(arch_map, dtype=torch.long)
+            fixed_labels[arch_map == 2] = 36
+            fixed_labels[arch_map == 3] = 37
+
+            fixed_log = index_to_log_onehot(
+                fixed_labels,
+                self.num_classes
+            )
+
+            fixed_mask = (arch_map != 1).unsqueeze(1)
+
+            # Fix Architecture before the first reverse step.
+            log_z = torch.where(
+                fixed_mask,
+                fixed_log,
+                log_z
+            )
+
         for i in reversed(range(0, self.num_timesteps)):
             print(f'Chain timestep {i:4d}', end='\r')
             t = torch.full((b,), i, device=device, dtype=torch.long)
-            log_z = self.p_sample(log_z, t, floor_plan, room_type, text_condition, mixed_condition_id)
+
+            log_z = self.p_sample(
+                log_z,
+                t,
+                floor_plan,
+                room_type,
+                text_condition,
+                mixed_condition_id
+            )
+
+            # Restore fixed Architecture after every reverse step.
+            if self.architecture_fixed:
+                log_z = torch.where(
+                    fixed_mask,
+                    fixed_log,
+                    log_z
+                )
 
             zs[i] = log_onehot_to_index(log_z)
+
         print()
         return zs
