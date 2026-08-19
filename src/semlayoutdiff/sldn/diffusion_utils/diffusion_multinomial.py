@@ -302,7 +302,7 @@ class MultinomialDiffusion(torch.nn.Module):
 
         return loss
 
-    def kl_prior(self, log_x_start):
+    def kl_prior(self, log_x_start, floor_plan=None):
         b = log_x_start.size(0)
         device = log_x_start.device
         ones = torch.ones(b, device=device).long()
@@ -311,6 +311,16 @@ class MultinomialDiffusion(torch.nn.Module):
         log_half_prob = -torch.log(self.num_classes * torch.ones_like(log_qxT_prob))
 
         kl_prior = self.multinomial_kl(log_qxT_prob, log_half_prob)
+
+        if self.architecture_fixed:
+            if floor_plan is None:
+                raise ValueError(
+                    "architecture_fixed=True requires an Architecture floor_plan"
+                )
+
+            generation_mask = (floor_plan == 1).float()
+            kl_prior = kl_prior * generation_mask
+
         return sum_except_batch(kl_prior)
 
     def compute_Lt(self, log_x_start, log_x_t, t, floor_plan, room_type, text_condition, mixed_condition_id, detach_mean=False):
@@ -323,9 +333,21 @@ class MultinomialDiffusion(torch.nn.Module):
             log_model_prob = log_model_prob.detach()
 
         kl = self.multinomial_kl(log_true_prob, log_model_prob)
-        kl = sum_except_batch(kl)
 
         decoder_nll = -log_categorical(log_x_start, log_model_prob)
+
+        if self.architecture_fixed:
+            if floor_plan is None:
+                raise ValueError(
+                    "architecture_fixed=True requires an Architecture floor_plan"
+                )
+
+            generation_mask = (floor_plan == 1).float()
+
+            kl = kl * generation_mask
+            decoder_nll = decoder_nll * generation_mask
+
+        kl = sum_except_batch(kl)
         decoder_nll = sum_except_batch(decoder_nll)
 
         mask = (t == torch.zeros_like(t)).float()
@@ -366,8 +388,21 @@ class MultinomialDiffusion(torch.nn.Module):
 
             log_x_start = index_to_log_onehot(x_start, self.num_classes)
 
+            log_x_t = self.q_sample(
+                log_x_start=log_x_start,
+                t=t,
+                floor_plan=floor_plan
+            )
+
             kl = self.compute_Lt(
-                log_x_start, self.q_sample(log_x_start=log_x_start, t=t), t, floor_plan, room_type, text_condition, mixed_condition_id)
+                log_x_start,
+                log_x_t,
+                t,
+                floor_plan,
+                room_type,
+                text_condition,
+                mixed_condition_id
+            )
 
             Lt2 = kl.pow(2)
             Lt2_prev = self.Lt_history.gather(dim=0, index=t)
@@ -375,7 +410,10 @@ class MultinomialDiffusion(torch.nn.Module):
             self.Lt_history.scatter_(dim=0, index=t, src=new_Lt_history)
             self.Lt_count.scatter_add_(dim=0, index=t, src=torch.ones_like(Lt2))
 
-            kl_prior = self.kl_prior(log_x_start)
+            kl_prior = self.kl_prior(
+                log_x_start,
+                floor_plan=floor_plan
+            )
 
             # Upweigh loss term of the kl
             vb_loss = kl / pt + kl_prior
@@ -417,10 +455,26 @@ class MultinomialDiffusion(torch.nn.Module):
 
             t, pt = self.sample_time(b, device, 'importance')
 
-            kl = self.compute_Lt(
-                log_x_start, self.q_sample(log_x_start=log_x_start, t=t), t, floor_plan=floor_plan, room_type=room_type, text_condition=text_condition, mixed_condition_id=mixed_condition_id)
+            log_x_t = self.q_sample(
+                log_x_start=log_x_start,
+                t=t,
+                floor_plan=floor_plan
+            )
 
-            kl_prior = self.kl_prior(log_x_start)
+            kl = self.compute_Lt(
+                log_x_start,
+                log_x_t,
+                t,
+                floor_plan=floor_plan,
+                room_type=room_type,
+                text_condition=text_condition,
+                mixed_condition_id=mixed_condition_id
+            )
+
+            kl_prior = self.kl_prior(
+                log_x_start,
+                floor_plan=floor_plan
+            )
 
             # Upweigh loss term of the kl
             loss = kl / pt + kl_prior
