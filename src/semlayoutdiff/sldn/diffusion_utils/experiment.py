@@ -101,7 +101,7 @@ class DiffusionExperiment(BaseExperiment):
             self.writer = SummaryWriter(os.path.join(self.log_path, 'tb'))
             self.writer.add_text("args", get_args_table(args_dict).get_html_string(), global_step=0)
         if args.log_wandb:
-            wandb.init(config=args_dict, project=args.project, id=args.name, dir=self.log_path, settings=wandb.Settings(start_method="fork"))
+            wandb.init(config=args_dict, project=args.project, name=args.name, dir=self.log_path, settings=wandb.Settings(start_method="fork"))
 
     def log_samples_fn(self, epoch):
         """Generate and log samples to wandb.
@@ -121,12 +121,24 @@ class DiffusionExperiment(BaseExperiment):
 
         # Weights & Biases
         if self.args.log_wandb:
+            wandb_metrics = {
+                'epoch': epoch + 1,
+                'learning_rate': self.optimizer.param_groups[0]['lr']
+            }
+
             for metric_name, metric_value in train_dict.items():
-                wandb.log({'base/{}'.format(metric_name): metric_value}, step=epoch+1)
+                wandb_metrics['base/{}'.format(metric_name)] = metric_value
+
             if eval_dict:
                 for metric_name, metric_value in eval_dict.items():
-                    wandb.log({'eval/{}'.format(metric_name): metric_value}, step=epoch+1)
-            
+                    wandb_metrics['eval/{}'.format(metric_name)] = metric_value
+
+            wandb.log(
+                wandb_metrics,
+                step=epoch + 1,
+                commit=True
+            )
+
             # Log samples if enabled and it's time to log
             if self.args.log_samples and (epoch + 1) % self.args.sample_every == 0:
                 self.log_samples_fn(epoch)

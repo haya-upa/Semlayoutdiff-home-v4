@@ -174,21 +174,14 @@ class Experiment(DiffusionExperiment):
         return loss_sum, loss_count, loss_floor_sum
 
     def eval_fn(self, epoch):
-        """Evaluate the model on training and validation sets."""
+        """Evaluate the model on the held-out validation set."""
         self.model.eval()
         
         with torch.no_grad():
-            # Evaluate on training set
-            train_loss_sum, train_loss_count, train_floor_sum = self._evaluate_on_loader(
-                self.train_loader, "Train evaluating", epoch
-            )
-            
-            # Evaluate on validation set
             eval_loss_sum, eval_loss_count, eval_floor_sum = self._evaluate_on_loader(
                 self.eval_loader, "     Evaluating", epoch
             )
         
-        # Return validation metrics
         return (
             {"bpd": eval_loss_sum / eval_loss_count, "floor_loss": eval_floor_sum / eval_loss_count}
             if self.args.floor_loss

@@ -5,7 +5,7 @@ diffusion_steps: 4000
 dataset: front3d
 batch_size: 48
 dp_rate: 0.1
-augmentation: shift
+augmentation:
 lr: 0.0001
 warmup: 5
 data_dir: unified_w_arch
@@ -26,3 +26,5 @@ num_samples: 4
 mix_condition: false
 
 architecture_fixed: true
+validation_split: 0.1
+split_seed: 0
