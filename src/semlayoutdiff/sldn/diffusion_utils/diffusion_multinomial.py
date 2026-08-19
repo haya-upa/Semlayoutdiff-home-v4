@@ -254,10 +254,31 @@ class MultinomialDiffusion(torch.nn.Module):
         log_sample = index_to_log_onehot(sample, self.num_classes)
         return log_sample
 
-    def q_sample(self, log_x_start, t):
+    def q_sample(self, log_x_start, t, floor_plan=None):
         log_EV_qxt_x0 = self.q_pred(log_x_start, t)
 
         log_sample = self.log_sample_categorical(log_EV_qxt_x0)
+
+        if floor_plan is not None:
+            if floor_plan.dim() == 4 and floor_plan.size(1) == 1:
+                arch_map = floor_plan
+            elif floor_plan.dim() == 3:
+                arch_map = floor_plan.unsqueeze(1)
+            else:
+                raise ValueError(
+                    f"Unexpected Architecture shape: {tuple(floor_plan.shape)}"
+                )
+
+            # Architecture 1 = generation region.
+            # Architecture 0/2/3 = fixed region.
+            fixed_mask = (arch_map != 1).unsqueeze(1)
+
+            # Keep the original semantic labels on fixed Architecture pixels.
+            log_sample = torch.where(
+                fixed_mask,
+                log_x_start,
+                log_sample
+            )
 
         return log_sample
 
