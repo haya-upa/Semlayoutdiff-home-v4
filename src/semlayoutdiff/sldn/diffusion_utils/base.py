@@ -43,6 +43,7 @@ class BaseExperiment(object):
         self.train_metrics = {}
         self.eval_metrics = {}
         self.eval_epochs = []
+        self.best_eval_bpd = float('inf')
 
     def train_fn(self, epoch):
         raise NotImplementedError()
@@ -112,6 +113,7 @@ class BaseExperiment(object):
                       'train_metrics': self.train_metrics,
                       'eval_metrics': self.eval_metrics,
                       'eval_epochs': self.eval_epochs,
+                      'best_eval_bpd': self.best_eval_bpd,
                       'model': self.model.state_dict(),
                       'optimizer': self.optimizer.state_dict(),
                       'scheduler_iter': self.scheduler_iter.state_dict() if self.scheduler_iter else None,
@@ -124,6 +126,7 @@ class BaseExperiment(object):
         self.train_metrics = checkpoint['train_metrics']
         self.eval_metrics = checkpoint['eval_metrics']
         self.eval_epochs = checkpoint['eval_epochs']
+        self.best_eval_bpd = checkpoint.get('best_eval_bpd', float('inf'))
         self.model.load_state_dict(checkpoint['model'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
         if self.scheduler_iter: self.scheduler_iter.load_state_dict(checkpoint['scheduler_iter'])
@@ -138,8 +141,17 @@ class BaseExperiment(object):
             self.log_train_metrics(train_dict)
 
             # Eval
+            is_best = False
+
             if (epoch+1) % self.eval_every == 0:
                 eval_dict = self.eval_fn(epoch)
+
+                if 'bpd' in eval_dict and eval_dict['bpd'] < self.best_eval_bpd:
+                    self.best_eval_bpd = float(eval_dict['bpd'])
+                    is_best = True
+
+                eval_dict['best_bpd'] = self.best_eval_bpd
+
                 self.log_eval_metrics(eval_dict)
                 self.eval_epochs.append(epoch)
             else:
@@ -151,6 +163,14 @@ class BaseExperiment(object):
 
             # Checkpoint
             self.current_epoch += 1
+
+            if is_best:
+                self.checkpoint_save(name='checkpoint_best.pt')
+                print(
+                    f"Saved best checkpoint "
+                    f"(eval bpd: {self.best_eval_bpd:.6f})"
+                )
+
             if (epoch+1) % self.check_every == 0:
                 self.checkpoint_save()
 
