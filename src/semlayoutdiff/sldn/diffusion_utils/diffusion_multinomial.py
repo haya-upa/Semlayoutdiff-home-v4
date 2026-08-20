@@ -543,17 +543,30 @@ class MultinomialDiffusion(torch.nn.Module):
             fixed_labels[arch_map == 2] = 36
             fixed_labels[arch_map == 3] = 37
 
-            fixed_log = index_to_log_onehot(
+            fixed_log_x0 = index_to_log_onehot(
                 fixed_labels,
                 self.num_classes
             )
 
             fixed_mask = (arch_map != 1).unsqueeze(1)
 
-            # Fix Architecture before the first reverse step.
+            # RePaint-style initialization:
+            # Keep the known Architecture at the same noise level
+            # as the initial reverse-diffusion state.
+            start_t = torch.full(
+                (b,),
+                self.num_timesteps - 1,
+                device=device,
+                dtype=torch.long
+            )
+
+            fixed_log_t = self.log_sample_categorical(
+                self.q_pred(fixed_log_x0, start_t)
+            )
+
             log_z = torch.where(
                 fixed_mask,
-                fixed_log,
+                fixed_log_t,
                 log_z
             )
 
@@ -570,11 +583,28 @@ class MultinomialDiffusion(torch.nn.Module):
                 mixed_condition_id
             )
 
-            # Restore fixed Architecture after every reverse step.
+            # RePaint-style known-region update.
+            # Keep the known Architecture at the noise level
+            # corresponding to the next reverse-diffusion state.
             if self.architecture_fixed:
+                if i > 0:
+                    next_t = torch.full(
+                        (b,),
+                        i - 1,
+                        device=device,
+                        dtype=torch.long
+                    )
+
+                    fixed_log_next = self.log_sample_categorical(
+                        self.q_pred(fixed_log_x0, next_t)
+                    )
+                else:
+                    # Final output must exactly match the specified Architecture.
+                    fixed_log_next = fixed_log_x0
+
                 log_z = torch.where(
                     fixed_mask,
-                    fixed_log,
+                    fixed_log_next,
                     log_z
                 )
 
