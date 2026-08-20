@@ -583,6 +583,34 @@ class MultinomialDiffusion(torch.nn.Module):
                 mixed_condition_id
             )
 
+            # At the final step, Architecture 1 must remain interior.
+            # Preserve valid floor/furniture predictions and only replace
+            # invalid void/door/window predictions with floor (class 1).
+            if self.architecture_fixed and i == 0:
+                final_labels = log_onehot_to_index(log_z)
+
+                interior_mask = (arch_map == 1)
+
+                invalid_interior = (
+                    interior_mask
+                    & (
+                        (final_labels == 0)
+                        | (final_labels == 36)
+                        | (final_labels == 37)
+                    )
+                )
+
+                final_labels = torch.where(
+                    invalid_interior,
+                    torch.ones_like(final_labels),
+                    final_labels
+                )
+
+                log_z = index_to_log_onehot(
+                    final_labels,
+                    self.num_classes
+                )
+
             # RePaint-style known-region update.
             # Keep the known Architecture at the noise level
             # corresponding to the next reverse-diffusion state.
